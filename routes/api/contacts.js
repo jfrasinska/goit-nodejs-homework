@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const contactsHandler = require("./contactsHandler");
 
-router.get("/", async (req, res, next) => {
+router.get("/", async (req, res) => {
   try {
     const contacts = await contactsHandler.listContacts();
     res.status(200).json(contacts);
@@ -11,8 +11,8 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.get("/:contactId", async (req, res, next) => {
-  const contactId = req.params.contactId;
+router.get("/:id", async (req, res) => {
+  const contactId = req.params.id;
   try {
     const contact = await contactsHandler.getById(contactId);
     if (contact) {
@@ -25,25 +25,22 @@ router.get("/:contactId", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", async (req, res) => {
   const { name, email, phone } = req.body;
 
-  if (!name || !email || !phone) {
-    res.status(400).json({ message: "Missing required fields" });
-  } else {
-    try {
-      const newContact = await addContact({ name, email, phone });
-      res.status(201).json(newContact);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
+  try {
+    const newContact = await contactsHandler.addContact({ name, email, phone });
+    res.status(201).json(newContact);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 
-router.delete("/:contactId", async (req, res, next) => {
-  const contactId = req.params.contactId;
+router.delete("/:id", async (req, res) => {
+  const contactId = req.params.id;
+
   try {
-    const result = await removeContact(contactId);
+    const result = await contactsHandler.removeContact(contactId);
     if (result) {
       res.status(200).json({ message: "Contact deleted" });
     } else {
@@ -54,23 +51,22 @@ router.delete("/:contactId", async (req, res, next) => {
   }
 });
 
-router.put("/:contactId", async (req, res, next) => {
-  const contactId = req.params.contactId;
+router.put("/:id", async (req, res) => {
+  const contactId = req.params.id;
   const updatedFields = req.body;
 
-  if (!updatedFields || Object.keys(updatedFields).length === 0) {
-    res.status(400).json({ message: "Missing fields" });
-  } else {
-    try {
-      const updatedContact = await updateContact(contactId, updatedFields);
-      if (updatedContact) {
-        res.status(200).json(updatedContact);
-      } else {
-        res.status(404).json({ message: "Not found" });
-      }
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+  try {
+    const updatedContact = await contactsHandler.updateContact(
+      contactId,
+      updatedFields
+    );
+    if (updatedContact) {
+      res.status(200).json(updatedContact);
+    } else {
+      res.status(404).json({ message: "Not found" });
     }
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 

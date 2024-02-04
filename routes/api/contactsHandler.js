@@ -1,6 +1,6 @@
 const fs = require("fs").promises;
 const path = require("path");
-const { nanoid } = "nanoid";
+const { createHash } = require("crypto");
 
 const contactsPath = path.join(__dirname, "../../contacts.json");
 
@@ -17,6 +17,12 @@ const writeContacts = async (contacts) => {
   await fs.writeFile(contactsPath, JSON.stringify(contacts, null, 2), "utf-8");
 };
 
+const generateUniqueId = () => {
+  const hash = createHash("sha256");
+  hash.update(Math.random().toString());
+  return hash.digest("hex");
+};
+
 const listContacts = async () => {
   return await readContacts();
 };
@@ -28,7 +34,7 @@ const getById = async (id) => {
 
 const addContact = async (contact) => {
   const contacts = await readContacts();
-  contact.id = nanoid();
+  contact.id = generateUniqueId();
   contacts.push(contact);
   await writeContacts(contacts);
   return contact;

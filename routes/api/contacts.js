@@ -1,6 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const contactsHandler = require("./contactsHandler");
+const Joi = require("joi");
+
+const contactSchema = Joi.object({
+  name: Joi.string().required(),
+  email: Joi.string().email().required(),
+  phone: Joi.string().required(),
+});
 
 router.get("/", async (req, res) => {
   try {
@@ -26,13 +33,19 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  const { error } = contactSchema.validate(req.body);
+
+  if (error) {
+    return res.status(400).json({ message: error.message });
+  }
+
   const { name, email, phone } = req.body;
 
   try {
     const newContact = await contactsHandler.addContact({ name, email, phone });
     res.status(201).json(newContact);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -55,6 +68,12 @@ router.put("/:id", async (req, res) => {
   const contactId = req.params.id;
   const updatedFields = req.body;
 
+  const { error } = contactSchema.validate(updatedFields);
+
+  if (error) {
+    return res.status(400).json({ message: error.message });
+  }
+
   try {
     const updatedContact = await contactsHandler.updateContact(
       contactId,
@@ -66,7 +85,7 @@ router.put("/:id", async (req, res) => {
       res.status(404).json({ message: "Not found" });
     }
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 

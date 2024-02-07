@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const contactsHandler = require("./contactsHandler");
+const authMiddleware = require("../../middleware/authMiddleware");
 const Joi = require("joi");
 
 const contactSchema = Joi.object({
@@ -9,7 +10,7 @@ const contactSchema = Joi.object({
   phone: Joi.string().required(),
 });
 
-router.get("/", async (req, res) => {
+router.get("/", authMiddleware, async (req, res) => {
   try {
     const contacts = await contactsHandler.listContacts();
     res.status(200).json(contacts);
@@ -32,7 +33,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", authMiddleware, async (req, res) => {
   const { error } = contactSchema.validate(req.body);
 
   if (error) {
@@ -49,7 +50,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authMiddleware, async (req, res) => {
   const contactId = req.params.id;
 
   try {
@@ -64,7 +65,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", authMiddleware, async (req, res) => {
   const contactId = req.params.id;
   const updatedFields = req.body;
 
@@ -89,8 +90,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-module.exports = router;
-router.patch("/:contactId/favorite", async (req, res) => {
+router.patch("/:contactId/favorite", authMiddleware, async (req, res) => {
   const contactId = req.params.contactId;
   const { favorite } = req.body;
 
@@ -111,6 +111,24 @@ router.patch("/:contactId/favorite", async (req, res) => {
     }
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/logout", authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(401).json({ message: "Not authorized" });
+    }
+
+    user.token = null;
+    await user.save();
+
+    res.status(204).end();
+  } catch (error) {
+    next(error);
   }
 });
 

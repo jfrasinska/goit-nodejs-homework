@@ -12,19 +12,26 @@ const contactSchema = Joi.object({
 
 router.get("/", authMiddleware, async (req, res) => {
   try {
-    const contacts = await contactsHandler.listContacts();
+    const ownerId = req.user._id;
+    const contacts = await contactsHandler.listContacts(ownerId);
     res.status(200).json(contacts);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", authMiddleware, async (req, res) => {
   const contactId = req.params.id;
   try {
     const contact = await contactsHandler.getById(contactId);
     if (contact) {
-      res.status(200).json(contact);
+      if (contact.owner.toString() === req.user._id.toString()) {
+        res.status(200).json(contact);
+      } else {
+        res
+          .status(403)
+          .json({ message: "Forbidden: Contact does not belong to the user" });
+      }
     } else {
       res.status(404).json({ message: "Not found" });
     }
@@ -41,9 +48,15 @@ router.post("/", authMiddleware, async (req, res) => {
   }
 
   const { name, email, phone } = req.body;
+  const ownerId = req.user._id;
 
   try {
-    const newContact = await contactsHandler.addContact({ name, email, phone });
+    const newContact = await contactsHandler.addContact({
+      name,
+      email,
+      phone,
+      owner: ownerId,
+    });
     res.status(201).json(newContact);
   } catch (error) {
     res.status(500).json({ message: error.message });

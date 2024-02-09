@@ -16,13 +16,17 @@ const contactSchema = new Schema({
     type: Boolean,
     default: false,
   },
+  owner: {
+    type: Schema.Types.ObjectId,
+    ref: "user",
+  },
 });
 
 const Contact = mongoose.model("Contact", contactSchema);
 
-const listContacts = async () => {
+const listContacts = async (ownerId) => {
   try {
-    return await Contact.find();
+    return await Contact.find({ owner: ownerId });
   } catch (error) {
     throw error;
   }

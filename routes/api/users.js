@@ -3,6 +3,7 @@ const router = express.Router();
 const Joi = require("joi");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const gravatar = require("gravatar");
 const User = require("../../models/userModel");
 const saltRounds = 10;
 
@@ -31,15 +32,25 @@ router.post("/signup", async (req, res, next) => {
     }
 
     const salt = await bcryptjs.genSalt(saltRounds);
-
     const hashedPassword = await bcryptjs.hash(password, salt);
 
-    const newUser = await User.create({ email, password: hashedPassword });
+    const avatarURL = gravatar.url(email, {
+      s: "200",
+      r: "pg",
+      d: "identicon",
+    });
+
+    const newUser = await User.create({
+      email,
+      password: hashedPassword,
+      avatarURL,
+    });
 
     return res.status(201).json({
       user: {
         email: newUser.email,
         subscription: newUser.subscription,
+        avatarURL: newUser.avatarURL,
       },
     });
   } catch (error) {

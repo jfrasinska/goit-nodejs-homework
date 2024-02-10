@@ -9,6 +9,8 @@ const multer = require("multer");
 const path = require("path");
 const jimp = require("jimp");
 const { v4: uuidv4 } = require("uuid");
+const sgMail = require("@sendgrid/mail");
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const storage = multer.diskStorage({
   destination: "tmp",
@@ -45,6 +47,19 @@ router.post("/signup", async (req, res, next) => {
       return res.status(409).json({ message: "Email in use" });
     }
 
+    const verificationToken = uuidv4();
+    const verificationLink = `${process.env.BASE_URL}/users/verify/${verificationToken}`;
+
+    const msg = {
+      to: email,
+      from: process.env.SENDGRID_VERIFIED_SENDER,
+      subject: "Email Verification",
+      text: `Click the link to verify your email: ${verificationLink}`,
+      html: `<p>Click the link to verify your email: <a href="${verificationLink}">${verificationLink}</a></p>`,
+    };
+
+    await sgMail.send(msg);
+
     const salt = await bcryptjs.genSalt(saltRounds);
     const hashedPassword = await bcryptjs.hash(password, salt);
 
@@ -58,6 +73,7 @@ router.post("/signup", async (req, res, next) => {
       email,
       password: hashedPassword,
       avatarURL,
+      verificationToken,
     });
 
     return res.status(201).json({
@@ -72,6 +88,25 @@ router.post("/signup", async (req, res, next) => {
   }
 });
 
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.verificationToken = null;
+    user.verify = true;
+    await user.save();
+
+    return res.status(200).json({ message: "Verification successful" });
+  } catch (error) {
+    next(error);
+  }
+});
 router.post("/login", async (req, res, next) => {
   try {
     const { error } = loginSchema.validate(req.body);

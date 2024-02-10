@@ -48,6 +48,7 @@ router.post("/signup", async (req, res, next) => {
     }
 
     const verificationToken = uuidv4();
+
     const verificationLink = `${process.env.BASE_URL}/users/verify/${verificationToken}`;
 
     const msg = {
@@ -62,12 +63,6 @@ router.post("/signup", async (req, res, next) => {
 
     const salt = await bcryptjs.genSalt(saltRounds);
     const hashedPassword = await bcryptjs.hash(password, salt);
-
-    const avatarURL = gravatar.url(email, {
-      s: "200",
-      r: "pg",
-      d: "identicon",
-    });
 
     const newUser = await User.create({
       email,
@@ -107,6 +102,7 @@ router.get("/verify/:verificationToken", async (req, res, next) => {
     next(error);
   }
 });
+
 router.post("/login", async (req, res, next) => {
   try {
     const { error } = loginSchema.validate(req.body);

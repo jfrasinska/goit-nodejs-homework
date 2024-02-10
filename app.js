@@ -2,6 +2,7 @@ const express = require("express");
 const logger = require("morgan");
 const cors = require("cors");
 const db = require("./routes/api/db");
+const multer = require("./multer");
 
 const contactsRouter = require("./routes/api/contacts");
 const usersRouter = require("./routes/api/users");
@@ -13,6 +14,8 @@ const formatsLogger = app.get("env") === "development" ? "dev" : "short";
 app.use(logger(formatsLogger));
 app.use(cors());
 app.use(express.json());
+
+app.use("/avatars", express.static("public/avatars"));
 
 app.use("/api/contacts", contactsRouter);
 app.use("/api/users", usersRouter);

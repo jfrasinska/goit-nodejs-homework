@@ -4,7 +4,22 @@ const Joi = require("joi");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/userModel");
-const saltRounds = 10;
+const authMiddleware = require("../../middleware/authMiddleware");
+const multer = require("multer");
+const path = require("path");
+const jimp = require("jimp");
+const { v4: uuidv4 } = require("uuid");
+
+const storage = multer.diskStorage({
+  destination: "tmp",
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const uniqueSuffix = uuidv4() + ext;
+    cb(null, uniqueSuffix);
+  },
+});
+
+const upload = multer({ storage });
 
 const signupSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -31,15 +46,25 @@ router.post("/signup", async (req, res, next) => {
     }
 
     const salt = await bcryptjs.genSalt(saltRounds);
-
     const hashedPassword = await bcryptjs.hash(password, salt);
 
-    const newUser = await User.create({ email, password: hashedPassword });
+    const avatarURL = gravatar.url(email, {
+      s: "200",
+      r: "pg",
+      d: "identicon",
+    });
+
+    const newUser = await User.create({
+      email,
+      password: hashedPassword,
+      avatarURL,
+    });
 
     return res.status(201).json({
       user: {
         email: newUser.email,
         subscription: newUser.subscription,
+        avatarURL: newUser.avatarURL,
       },
     });
   } catch (error) {
@@ -84,5 +109,35 @@ router.post("/login", async (req, res, next) => {
     next(error);
   }
 });
+
+router.patch(
+  "/avatars",
+  authMiddleware,
+  upload.single("avatar"),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const user = await User.findById(req.user._id);
+
+      if (!user) {
+        return res.status(401).json({ message: "Not authorized" });
+      }
+
+      const image = await jimp.read(req.file.path);
+      await image.cover(250, 250).write(`public/avatars/${req.file.filename}`);
+
+      const avatarURL = `/avatars/${req.file.filename}`;
+      user.avatarURL = avatarURL;
+      await user.save();
+
+      return res.status(200).json({ avatarURL });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 module.exports = router;

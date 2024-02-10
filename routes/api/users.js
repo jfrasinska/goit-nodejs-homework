@@ -33,6 +33,10 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const resendVerificationSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
 router.post("/signup", async (req, res, next) => {
   try {
     const { error } = signupSchema.validate(req.body);
@@ -136,6 +140,46 @@ router.post("/login", async (req, res, next) => {
         subscription: user.subscription,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify", async (req, res, next) => {
+  try {
+    const { error } = resendVerificationSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: "Missing required field email" });
+    }
+
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res
+        .status(400)
+        .json({ message: "Verification has already been passed" });
+    }
+
+    const verificationToken = user.verificationToken;
+    const verificationLink = `${process.env.BASE_URL}/users/verify/${verificationToken}`;
+
+    const msg = {
+      to: email,
+      from: process.env.SENDGRID_VERIFIED_SENDER,
+      subject: "Email Verification",
+      text: `Click the link to verify your email: ${verificationLink}`,
+      html: `<p>Click the link to verify your email: <a href="${verificationLink}">${verificationLink}</a></p>`,
+    };
+
+    await sgMail.send(msg);
+
+    return res.status(200).json({ message: "Verification email sent" });
   } catch (error) {
     next(error);
   }

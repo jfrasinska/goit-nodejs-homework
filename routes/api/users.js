@@ -1,15 +1,16 @@
 const express = require("express");
 const router = express.Router();
+const path = require("path");
+const multer = require("multer");
+const jimp = require("jimp");
+const sgMail = require("@sendgrid/mail");
+const { v4: uuidv4 } = require("uuid");
 const Joi = require("joi");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/userModel");
 const authMiddleware = require("../../middleware/authMiddleware");
-const multer = require("multer");
-const path = require("path");
-const jimp = require("jimp");
-const { v4: uuidv4 } = require("uuid");
-const sgMail = require("@sendgrid/mail");
+
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const storage = multer.diskStorage({

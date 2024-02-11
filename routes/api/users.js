@@ -1,14 +1,17 @@
 const express = require("express");
 const router = express.Router();
+const path = require("path");
+const multer = require("multer");
+const jimp = require("jimp");
+const sgMail = require("@sendgrid/mail");
+const { v4: uuidv4 } = require("uuid");
 const Joi = require("joi");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/userModel");
 const authMiddleware = require("../../middleware/authMiddleware");
-const multer = require("multer");
-const path = require("path");
-const jimp = require("jimp");
-const { v4: uuidv4 } = require("uuid");
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const storage = multer.diskStorage({
   destination: "tmp",
@@ -31,6 +34,10 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+const resendVerificationSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
 router.post("/signup", async (req, res, next) => {
   try {
     const { error } = signupSchema.validate(req.body);
@@ -45,19 +52,28 @@ router.post("/signup", async (req, res, next) => {
       return res.status(409).json({ message: "Email in use" });
     }
 
+    const verificationToken = uuidv4();
+
+    const verificationLink = `${process.env.BASE_URL}/users/verify/${verificationToken}`;
+
+    const msg = {
+      to: email,
+      from: process.env.SENDGRID_VERIFIED_SENDER,
+      subject: "Email Verification",
+      text: `Click the link to verify your email: ${verificationLink}`,
+      html: `<p>Click the link to verify your email: <a href="${verificationLink}">${verificationLink}</a></p>`,
+    };
+
+    await sgMail.send(msg);
+
     const salt = await bcryptjs.genSalt(saltRounds);
     const hashedPassword = await bcryptjs.hash(password, salt);
-
-    const avatarURL = gravatar.url(email, {
-      s: "200",
-      r: "pg",
-      d: "identicon",
-    });
 
     const newUser = await User.create({
       email,
       password: hashedPassword,
       avatarURL,
+      verificationToken,
     });
 
     return res.status(201).json({
@@ -67,6 +83,26 @@ router.post("/signup", async (req, res, next) => {
         avatarURL: newUser.avatarURL,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.verificationToken = null;
+    user.verify = true;
+    await user.save();
+
+    return res.status(200).json({ message: "Verification successful" });
   } catch (error) {
     next(error);
   }
@@ -105,6 +141,46 @@ router.post("/login", async (req, res, next) => {
         subscription: user.subscription,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify", async (req, res, next) => {
+  try {
+    const { error } = resendVerificationSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: "Missing required field email" });
+    }
+
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res
+        .status(400)
+        .json({ message: "Verification has already been passed" });
+    }
+
+    const verificationToken = user.verificationToken;
+    const verificationLink = `${process.env.BASE_URL}/users/verify/${verificationToken}`;
+
+    const msg = {
+      to: email,
+      from: process.env.SENDGRID_VERIFIED_SENDER,
+      subject: "Email Verification",
+      text: `Click the link to verify your email: ${verificationLink}`,
+      html: `<p>Click the link to verify your email: <a href="${verificationLink}">${verificationLink}</a></p>`,
+    };
+
+    await sgMail.send(msg);
+
+    return res.status(200).json({ message: "Verification email sent" });
   } catch (error) {
     next(error);
   }
